@@ -2,13 +2,12 @@
 
 var express = require("express"),
     crypto = require('crypto');
-    db = require('./classes/db').DB.open();
+    db = require('./classes/db').DB.open(),
+    config = require('./config').config;
 var app = express();
 
-var PASSWORD_SALT = "this is a long salt string ot make sure that nobody tries to take the passwords 734095837450470274732948529834750938475093845623987263507984578-60976734872368129746230598346749508634872350187346-234589347609386528734512987464-8934756034856230847623059834-5";
-
 app.use(express.bodyParser());
-//app.use(express.session({})); 
+app.use(express.session({ secret: config.SESSION_SECRET })); 
 
 app.get('/', function (req, res) {
     res.type('application/json');
@@ -123,7 +122,7 @@ var restricted = function (req, res, next) {
 
 var hashPassword = function (plain) {
     var hasher = crypto.createHash('sha512');
-    hasher.update(plain + PASSWORD_SALT, 'utf8');
+    hasher.update(plain + config.PASSWORD_SALT, 'utf8');
 
     return hasher.digest('hex');
 }
