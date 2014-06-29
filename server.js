@@ -16,27 +16,32 @@ app.get('/', function (req, res) {
 
 app.post('/api/users', function (req, res) {
     if (req.body.name.length <= 0) {
-        errored(res, "Name is required.")
+        errored(res, "Name is required.");
+        return;
     }
 
     if (req.body.email.length <= 0) {
-        errored(res, "Email is required.")
+        errored(res, "Email is required.");
+        return;
     }
 
     if (req.body.password.length <= 0) {
-        errored(res, "Password is required.")
+        errored(res, "Password is required.");
+        return;
     }
 
-    db.checkEmail(email, function (exists) {
+    var emailLower = req.body.email.toLowerCase();
+    db.checkEmail(emailLower, function (exists) {
         if (exists) {
-            errored(res, "Email already exists")
+            errored(res, "Email already exists.");
         } else {
             var name = req.body.name;
-            var email = req.body.email;
-            var password = encodePassword(req.body.password);
+            var email = emailLower;
+            var password = hashPassword(req.body.password);
 
             db.createUser(name, email, password, function (id) {
-
+                res.type('application/json');
+                res.send({id: id, });
             },
             function (error) {
                 errored(error);
@@ -46,30 +51,35 @@ app.post('/api/users', function (req, res) {
 });
 
 app.get('/api/users/:id', function (req, res) {
-    db.getUser(req.params.id, function (user) {
+    db.getUserFromId(req.params.id, function (user) {
+        if (!user) {
+            errored(res, "User not found.");
+            return;
+        }
+
         var response = {
-            user: user.name,
+            name: user.name,
             email: user.email,
         };
 
         res.type('application/json');
         res.send(response);
     }, function (error) {
-
+        errored(error);
     });
 });
 
 app.post('/api/users/login', function (req, res) {
-    var db = new pg.Client(dbConfig);
+    authenticate(req.body.email, req.body.password, function (error, user) {
+        if (error) {
+            res.type('application/json');
+            res.send(error);
+            return;
+        }
 
-    var client = new pg.Client(dbConfig);
-    client.connect();
+        // Generate and return token
 
-
-
-
-    res.type('application/json');
-    res.send('{"message": "it works!", "version": "0.0.1", }');
+    });
 });
 
 app.post('/api/users/logout', function (req, res) {
@@ -81,11 +91,11 @@ app.post('/api/users/logout', function (req, res) {
 });
 
 app.get('/api/notes/:id', function (req, res) {
-    var db = new pg.Client(dbConfig);
+    db.getNote(req.params.id, function (note) {
 
-
-    res.type('application/json');
-    res.send('{"message": "it works!", "version": "0.0.1", }');
+    }, function (error) {
+        errored(error);
+    });
 });
 
 app.post('/api/notes/:id', function (req, res) {
@@ -113,8 +123,33 @@ app.post('/api/notes/:id', function (req, res) {
 });
 
 var authenticate = function (email, password, completion) {
+    if (!email || email.length == 0) {
+        completion({ errorMessage: "Email cannot be blank", });
+    }
 
+    if (!password || password.length == 0) {
+        completion({ errorMessage: "Password cannot be blank", });
+    }
+
+    var emailLower = email.toLowerCase();
+    var passwordHashed = hashPassword(password);
+
+    db.getUserFromEmail(email, function (user) {
+        if (user) {
+            if (passwordHashed === user.password) {
+                completion(null, user);
+            } else {
+                completion({ errorMessage: "Passwords do not match.", });
+            }
+        } else {
+            var message = "No user found with the email " + email + ".";
+            completion({ errorMessage: message, });
+        }
+    }, function (error) {
+        completion({ errorMessage: "DatabaseError", });
+    });
 }
+
 
 var restricted = function (req, res, next) {
 
