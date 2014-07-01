@@ -9,6 +9,6 @@ CREATE TABLE notes (
     id SERIAL PRIMARY KEY,
     user_id SERIAL REFERENCES users,
     note TEXT NOT NULL,
-    created DATE DEFAULT NOW(),
-    last_modified DATE
+    created TIMESTAMP DEFAULT NOW(),
+    last_modified TIMESTAMP
 );

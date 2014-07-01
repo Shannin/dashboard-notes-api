@@ -60,7 +60,7 @@ var DB = function () {
     };
 
     singleton.updateUser = function (id, name, email, callback, error) {
-        var query = createQuery("UPDATE users SET name = $1, email = $2 WHERE id = $3", error, [name, email, id]);
+        var query = createQuery("UPDATE users SET name = $2, email = $3 WHERE id = $1", error, [id, name, email]);
 
         query.on("end", function (result) {
             if (callback) {
@@ -70,7 +70,7 @@ var DB = function () {
     };
 
     singleton.updateUserPassword = function (id, newPassword, callback, error) {
-        var query = createQuery("UPDATE users SET password = $1 WHERE id = $2", error, [newPassword, id]);
+        var query = createQuery("UPDATE users SET password = $2 WHERE id = $1", error, [id, newPassword]);
 
         query.on("end", function (result) {
             if (callback) {
@@ -102,7 +102,7 @@ var DB = function () {
     };
 
     singleton.updateNote = function (nodeId, note, callback, error) {
-        var query = createQuery("UPDATE notes SET note = $1 WHERE id = $2", error, [note, nodeId]);
+        var query = createQuery("UPDATE notes SET note = $2, last_modified = CURRENT_TIMESTAMP WHERE id = $1", error, [nodeId, note]);
 
         query.on("end", function (result) {
             if (callback) {
