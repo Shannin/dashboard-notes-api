@@ -7,14 +7,48 @@ var express = require("express"),
 var app = express();
 
 app.use(express.bodyParser());
-app.use(express.session({ secret: config.SESSION_SECRET })); 
+app.use(express.cookieParser());
+app.use(express.session({ secret: config.SESSION_SECRET }));
+app.use(app.router);
+
+app.use(function (req, res, next) {
+    res.type('application/json');
+    next();
+});
+
+var restricted = function (req, res, next) {
+    if (req.session.userId || req.session.test) {
+        next()
+    } else {
+        errored(res, "Access Denied.");
+    }
+}
+
 
 app.get('/', function (req, res) {
-    res.type('application/json');
     res.send('{"message": "It\'s alive!", "version": "0.1.0", }');
 });
 
-app.post('/api/users', function (req, res) {
+app.get('/api/user', restricted, function (req, res) {
+    db.getUserFromId(req.params.id, function (user) {
+        if (!user) {
+            errored(res, "User not found.");
+            return;
+        }
+
+        var response = {
+            name: user.name,
+            email: user.email,
+        };
+
+        res.type('application/json');
+        res.send(response);
+    }, function (error) {
+        errored(error);
+    });
+});
+
+app.post('/api/user/register', function (req, res) {
     if (req.body.name.length <= 0) {
         errored(res, "Name is required.");
         return;
@@ -40,7 +74,6 @@ app.post('/api/users', function (req, res) {
             var password = hashPassword(req.body.password);
 
             db.createUser(name, email, password, function (id) {
-                res.type('application/json');
                 res.send({id: id, });
             },
             function (error) {
@@ -50,26 +83,7 @@ app.post('/api/users', function (req, res) {
     });
 });
 
-app.get('/api/users/:id', function (req, res) {
-    db.getUserFromId(req.params.id, function (user) {
-        if (!user) {
-            errored(res, "User not found.");
-            return;
-        }
-
-        var response = {
-            name: user.name,
-            email: user.email,
-        };
-
-        res.type('application/json');
-        res.send(response);
-    }, function (error) {
-        errored(error);
-    });
-});
-
-app.post('/api/users/login', function (req, res) {
+app.post('/api/user/login', function (req, res) {
     authenticate(req.body.email, req.body.password, function (error, user) {
         if (error) {
             res.type('application/json');
@@ -77,20 +91,23 @@ app.post('/api/users/login', function (req, res) {
             return;
         }
 
-        // Generate and return token
-
+        req.session.regenerate(function(){
+            req.session.userId = user.id;
+            res.send({});
+        });
     });
 });
 
-app.post('/api/users/logout', function (req, res) {
-    var db = new pg.Client(dbConfig);
-
-
-    res.type('application/json');
-    res.send('{"message": "it works!", "version": "0.0.1", }');
+app.post('/api/user/logout', restricted, function (req, res) {
+    req.session.destroy();
+    res.send({});
 });
 
-app.get('/api/notes/:id', function (req, res) {
+app.get('/api/notes', restricted, function (req, res) {
+
+});
+
+app.get('/api/notes/:id', restricted, function (req, res) {
     db.getNote(req.params.id, function (note) {
 
     }, function (error) {
@@ -98,28 +115,12 @@ app.get('/api/notes/:id', function (req, res) {
     });
 });
 
-app.post('/api/notes/:id', function (req, res) {
-    var db = new pg.Client(dbConfig);
+app.post('/api/notes/:id/update', restricted, function (req, res) {
 
-
-    res.type('application/json');
-    res.send('{"message": "it works!", "version": "0.0.1", }');
 });
 
-app.post('/api/notes/update/:id', function (req, res) {
-    var db = new pg.Client(dbConfig);
+app.post('/api/notes/:id/delete', restricted, function (req, res) {
 
-
-    res.type('application/json');
-    res.send('{"message": "it works!", "version": "0.0.1", }');
-});
-
-app.post('/api/notes/:id', function (req, res) {
-    var db = new pg.Client(dbConfig);
-
-
-    res.type('application/json');
-    res.send('{"message": "it works!", "version": "0.0.1", }');
 });
 
 var authenticate = function (email, password, completion) {
@@ -150,11 +151,6 @@ var authenticate = function (email, password, completion) {
     });
 }
 
-
-var restricted = function (req, res, next) {
-
-}
-
 var hashPassword = function (plain) {
     var hasher = crypto.createHash('sha512');
     hasher.update(plain + config.PASSWORD_SALT, 'utf8');
@@ -163,7 +159,6 @@ var hashPassword = function (plain) {
 }
 
 var errored = function (res, message) {
-    res.type('application/json');
     res.send({errorMesage: message});
 }
 
