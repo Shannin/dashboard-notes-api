@@ -17,8 +17,8 @@ app.use(function (req, res, next) {
 });
 
 var restricted = function (req, res, next) {
-    if (req.session.userId || req.session.test) {
-        next()
+    if (req.session.userId) {
+        next();
     } else {
         errored(res, "Access Denied.");
     }
@@ -26,11 +26,11 @@ var restricted = function (req, res, next) {
 
 
 app.get('/', function (req, res) {
-    res.send('{"message": "It\'s alive!", "version": "0.1.0", }');
+    res.send({message: "It\'s alive!", version: "0.1.0", });
 });
 
 app.get('/api/user', restricted, function (req, res) {
-    db.getUserFromId(req.params.id, function (user) {
+    db.getUserFromId(req.session.userId, function (user) {
         if (!user) {
             errored(res, "User not found.");
             return;
@@ -41,7 +41,6 @@ app.get('/api/user', restricted, function (req, res) {
             email: user.email,
         };
 
-        res.type('application/json');
         res.send(response);
     }, function (error) {
         errored(error);
@@ -86,7 +85,6 @@ app.post('/api/user/register', function (req, res) {
 app.post('/api/user/login', function (req, res) {
     authenticate(req.body.email, req.body.password, function (error, user) {
         if (error) {
-            res.type('application/json');
             res.send(error);
             return;
         }
@@ -98,9 +96,14 @@ app.post('/api/user/login', function (req, res) {
     });
 });
 
-app.post('/api/user/logout', restricted, function (req, res) {
-    req.session.destroy();
-    res.send({});
+app.get('/api/user/logout', function (req, res) {
+    if (req.session.userId) {
+        req.session.destroy(function () {
+            res.send({});
+        });
+    } else {
+        errored(res, "Not logged in.");
+    }
 });
 
 app.get('/api/notes', restricted, function (req, res) {
@@ -125,7 +128,7 @@ app.post('/api/notes/:id/delete', restricted, function (req, res) {
 
 var authenticate = function (email, password, completion) {
     if (!email || email.length == 0) {
-        completion({ errorMessage: "Email cannot be blank", });
+        completion({ errorMessage: "Email cannot be blank.", });
     }
 
     if (!password || password.length == 0) {
